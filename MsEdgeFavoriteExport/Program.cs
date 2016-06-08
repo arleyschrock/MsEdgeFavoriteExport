@@ -11,6 +11,35 @@ namespace MsEdgeFavoriteExport
 {
     class Program
     {
+        public static string TargetRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Favorites");
+
+        private static void CreateShortcut(FavoriteItem item, string saveLocation)
+        {
+            try
+            {
+                using (var writer = new StreamWriter(saveLocation))
+                {
+                    writer.WriteLine("[InternetShortcut]");
+                    writer.WriteLine($"URL={item.URL}");
+                    writer.Flush();
+                }
+            }
+            catch (Exception e)
+            {
+                WriteLine($"Error while saving {item.Title}, '{item.URL}' to location: {saveLocation}\nThe error message was:\n{e.Message}");
+            }
+        }
+
+        private static IEnumerable<FavoriteItem> FolderLineage(IEnumerable<FavoriteItem> source, FavoriteItem target)
+        {
+            target = source.FirstOrDefault(x => x.ParentId == target.ParentId && x.IsFolder);
+            while (target != null && !string.IsNullOrWhiteSpace(target.ParentId))
+            {
+                yield return target;
+                target = source.FirstOrDefault(x => x.ItemId == target.ParentId && x.IsFolder);
+            }
+        }
+
         static void Main(string[] args)
         {
             Listeners.Add(new System.Diagnostics.TextWriterTraceListener(Console.Out));
@@ -30,10 +59,6 @@ namespace MsEdgeFavoriteExport
             {
                 WriteLine("Unable to locate package directory. Are you running a modern version of Windows?");
             }
-
-#if DEBUG
-            Console.ReadKey();
-#endif
         }
 
         private static void ProcessEdge(DirectoryInfo packageDir)
@@ -63,8 +88,6 @@ namespace MsEdgeFavoriteExport
 
             }
         }
-
-        public static string TargetRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Favorites");
         private static string Q(string x) => Path.Combine(TargetRoot, x);
         private static string Q(params string[] x) => Path.Combine(x);
         private static void Save(FavoriteItem item, IEnumerable<FavoriteItem> items)
@@ -84,33 +107,6 @@ namespace MsEdgeFavoriteExport
             }
 
             CreateShortcut(item, Path.Combine(dir, $"{Path.GetInvalidPathChars().Aggregate(item.Title, (title, x) => title.Replace(x, '_'), x => x)}.url"));
-        }
-
-        private static void CreateShortcut(FavoriteItem item, string saveLocation)
-        {
-            try
-            {
-                using (var writer = new StreamWriter(saveLocation))
-                {
-                    writer.WriteLine("[InternetShortcut]");
-                    writer.WriteLine($"URL={item.URL}");
-                    writer.Flush();
-                }
-            }
-            catch (Exception e)
-            {
-                WriteLine($"Error while saving {item.Title}, '{item.URL}' to location: {saveLocation}\nThe error message was:\n{e.Message}");
-            }
-        }
-
-        private static IEnumerable<FavoriteItem> FolderLineage(IEnumerable<FavoriteItem> source, FavoriteItem target)
-        {
-            target = source.FirstOrDefault(x => x.ParentId == target.ParentId && x.IsFolder);
-            while (target != null && !string.IsNullOrWhiteSpace(target.ParentId))
-            {
-                yield return target;
-                target = source.FirstOrDefault(x => x.ItemId == target.ParentId && x.IsFolder);
-            }
         }
     }
 }
